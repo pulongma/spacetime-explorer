@@ -387,7 +387,9 @@ import scipy.special as sc
 import json as _j
 
 def _matern(r, phi, nu):
-    z = np.maximum(np.asarray(r, float), 0.0) / float(phi)
+    # Explicit case: C(0) = 1 by definition.
+    r  = np.asarray(r, float)
+    z  = np.maximum(r, 0.0) / float(phi)
     nu = float(nu)
     with np.errstate(invalid='ignore', divide='ignore', over='ignore'):
         if   nu == 0.5: out = np.exp(-z)
@@ -396,20 +398,21 @@ def _matern(r, phi, nu):
         else:
             c = (2.0 ** (1.0 - nu)) / sc.gamma(nu)
             out = c * np.power(z, nu) * sc.kv(nu, z)
-        out = np.where(z < 1e-10, 1.0, out)
+        out = np.where(r == 0.0, 1.0, out)
         out = np.where(np.isfinite(out), out, 0.0)
     return out
 
 def _ch(r, phi, nu, alpha):
     # C(r) = Γ(ν+α)/Γ(ν) · U(α, 1−ν, (r/φ)²)
     # U(a, b, z) is well-defined for all real b; scipy handles negative b correctly.
-    z  = np.maximum(np.asarray(r, float), 0.0) / float(phi)
-    z2 = z * z
+    # Explicit case: C(0) = 1 by definition.
+    r  = np.asarray(r, float)
+    z2 = np.maximum(r, 0.0) ** 2 / float(phi) ** 2
     c  = np.exp(sc.gammaln(float(nu) + float(alpha)) - sc.gammaln(float(nu)))
-    with np.errstate(invalid='ignore', divide='ignore'):
-        out = c * sc.hyperu(float(alpha), float(1.0 - nu), z2)
-        out = np.where(z < 1e-10, 1.0, out)
-        out = np.where(np.isfinite(out) & (out >= 0), out, 0.0)
+    #with np.errstate(invalid='ignore', divide='ignore'):
+    out = c * sc.hyperu(float(alpha), float(1.0 - nu), z2)
+    out = np.where(r == 0.0, 1.0, out)
+    #out = np.where(np.isfinite(out) & (out >= 0), out, 0.0)
     return out
 
 def compute_grid(model, h_js, u_js, params_json):
@@ -423,13 +426,13 @@ def compute_grid(model, h_js, u_js, params_json):
         C  = p['sigma2'] * Cs * Ct
     elif model == 'gne':
         absU = np.abs(U)
-        psi  = np.where(absU < 1e-10, 1.0, p['phi_t'] * absU**(2*p['alpha']) + 1.0)
+        psi  = p['phi_t'] * absU**(2*p['alpha']) + 1.0
         r    = np.abs(H) / psi**(p['beta'] / 2.0)
         C    = p['sigma2'] * psi**(-p['delta']) * _matern(r, p['phi_s'], p['nu_s'])
     elif model == 'ch':
         d = 2
         absU = np.abs(U)
-        psi  = np.where(absU < 1e-10, 1.0, p['phi_t'] * absU**(2*p['alpha']) + 1.0)
+        psi  = p['phi_t'] * absU**(2*p['alpha']) + 1.0
         C    = p['sigma2'] * psi**(-d/2.0) * np.exp(-H**2 / (p['phi_s']**2 * psi))
     elif model == 'stein':
         C = np.zeros_like(H)
