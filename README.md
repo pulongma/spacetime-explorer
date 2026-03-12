@@ -2,7 +2,7 @@
 
 Interactive visualisation of six space-time covariance functions.
 
-**Live demo →** https://&lt;your-username&gt;.github.io/&lt;your-repo&gt;/
+**Live demo →** https://pulongma.github.io/spacetime-explorer/
 
 ## Models
 
@@ -10,7 +10,7 @@ Interactive visualisation of six space-time covariance functions.
 |---|---|
 | Separable | Product of Matérn marginals |
 | Gneiting | Gneiting (2002) JASA 97(458) |
-| Cressie-Huang | Cressie & Huang (1999) JASA 94(448) |
+| Cressie-Huang | Cressie & Huang (1999) |
 | Stein | Stein (2005) JASA 100(469) |
 | Lagrangian Matérn | Ma (2025) arXiv:2511.07959 |
 | Lagrangian CH | Ma (2025) arXiv:2511.07959 |
