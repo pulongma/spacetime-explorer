@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>gpbayeskit — Space-Time Covariance Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#2b5b84;--blue-m:#4b8bbe;--blue-l:#0072aa;--blue-p:#ddeef8;--blue-pp:#eef6fc;
+  --yellow:#ffd43b;
+  --bg:#fff;--bg-1:#f3f6f9;--bg-2:#eaeff5;--border:#c8d8e8;--border-s:#dce8f2;
+  --text:#1a1a1a;--text-s:#2d3e50;--text-m:#5a718a;--r:5px;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:'DM Sans',sans-serif;font-size:13.5px;color:var(--text);background:var(--bg-1);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+/* topbar */
+.topbar{flex-shrink:0;height:46px;background:var(--blue);border-bottom:3px solid var(--yellow);display:flex;align-items:center;padding:0 18px;gap:10px;z-index:10}
+.logo{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;color:#fff}
+.logo em{color:var(--yellow);font-style:normal}
+.topbar-div{color:rgba(255,255,255,0.25)}
+.topbar-pg{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:rgba(255,255,255,0.7)}
+.topbar-r{margin-left:auto;display:flex;gap:6px}
+.pill{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;background:var(--yellow);color:var(--blue);border-radius:20px;padding:2px 9px}
+
+/* shell */
+.shell{display:flex;flex:1;min-height:0;overflow:hidden}
+
+/* side */
+.side{width:300px;flex-shrink:0;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.side-in{overflow-y:auto;flex:1;padding-bottom:12px}
+.side-in::-webkit-scrollbar{width:4px}
+.side-in::-webkit-scrollbar-thumb{background:var(--bg-2);border-radius:2px}
+.pane{padding:13px 15px;border-bottom:1px solid var(--border-s)}
+.pane:last-child{border-bottom:none}
+.ph{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--blue-m);margin-bottom:10px}
+
+/* model buttons – 3 col grid */
+.mbtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.mbtn{padding:7px 5px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--bg-1);cursor:pointer;text-align:center;transition:all .14s}
+.mbtn:hover{border-color:var(--blue-m);background:var(--blue-pp)}
+.mbtn.on{border-color:var(--blue);background:var(--blue-p);box-shadow:0 0 0 3px rgba(43,91,132,0.1)}
+.mbtn-n{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:var(--blue);display:block;margin-bottom:1px}
+.mbtn-s{font-size:9px;color:var(--text-m);line-height:1.3}
+
+/* formula */
+.formula{font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.9;color:var(--text-s);background:var(--bg-1);border:1px solid var(--border);border-left:3px solid var(--blue-m);border-radius:var(--r);padding:9px 11px}
+.fl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--blue-m);display:block;margin-bottom:3px}
+.fc{color:var(--blue)}
+.fm{color:var(--text-m);font-style:italic}
+
+/* params */
+.param{margin-bottom:12px}.param:last-child{margin-bottom:0}
+.param-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+.param-nm{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:500;color:var(--text-s)}
+.param-vl{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--blue);width:58px;text-align:right;border:1px solid transparent;border-radius:3px;padding:1px 4px;background:transparent;outline:none;-moz-appearance:textfield}
+.param-vl:focus{border-color:var(--blue-m);background:var(--bg-1)}
+.param-vl::-webkit-inner-spin-button,.param-vl::-webkit-outer-spin-button{opacity:.4}
+.param-range-btn{font-size:10px;background:none;border:1px solid var(--border);border-radius:3px;color:var(--text-m);padding:1px 5px;cursor:pointer;line-height:1;margin-left:2px}
+.param-range-btn:hover{border-color:var(--blue-m);color:var(--blue)}
+.param-range-row{display:none;align-items:center;gap:5px;margin-top:3px;flex-wrap:nowrap}
+.param-range-row.open{display:flex}
+.param-range-row span{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-m);white-space:nowrap}
+.param-range-row input[type=number]{width:58px;padding:2px 5px;border:1px solid var(--border);border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text);background:var(--bg-1);outline:none}
+.param-range-row input[type=number]:focus{border-color:var(--blue-m)}
+.param-dc{font-size:10px;color:var(--text-m);margin-bottom:4px;line-height:1.3}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;background:var(--bg-2);border-radius:2px;outline:none;border:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--blue);cursor:pointer;box-shadow:0 0 0 3px var(--blue-p)}
+
+/* axis range */
+.ax-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ax-field label{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text-m);display:block;margin-bottom:4px}
+.ax-field input[type=number]{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text);background:var(--bg-1);outline:none;transition:border-color .15s}
+.ax-field input[type=number]:focus{border-color:var(--blue-m)}
+
+/* display opts */
+.opt-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.opt-row:last-child{margin-bottom:0}
+.opt-lbl{display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-s);cursor:pointer;user-select:none}
+input[type=checkbox]{accent-color:var(--blue);cursor:pointer}
+select{padding:4px 7px;border:1px solid var(--border);border-radius:var(--r);font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);background:var(--bg-1);cursor:pointer;outline:none}
+select:focus{border-color:var(--blue-m)}
+.sel-lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-m)}
+
+/* asym note */
+.asym-note{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#b07d00;background:#fffbe6;border:1px solid #ffe08a;border-radius:var(--r);padding:5px 9px;margin-top:8px;display:none}
+.asym-note.show{display:block}
+
+/* gen button */
+.gen-btn{display:block;width:100%;margin-top:4px;padding:9px 0;background:var(--blue);color:#fff;border:none;border-radius:var(--r);font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;letter-spacing:.5px;cursor:pointer;transition:background .14s,transform .1s}
+.gen-btn:hover{background:var(--blue-l)}
+.gen-btn:active{transform:scale(0.98)}
+
+/* main */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 20px 14px;gap:10px;overflow:hidden}
+.plot-header{display:flex;align-items:baseline;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.plot-title{font-family:'Source Serif 4',serif;font-size:17px;font-weight:600;color:var(--blue)}
+.plot-sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-m)}
+.ptags{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap}
+.ptag{font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--blue-p);color:var(--blue);border:1px solid rgba(43,91,132,0.2);border-radius:3px;padding:2px 7px}
+.asym-tag{background:#fffbe6;color:#8a5c00;border-color:#ffe08a}
+
+/* canvas wrap */
+.cw{flex:1;min-height:0;position:relative;background:var(--bg);border:1px solid var(--border);border-radius:6px;box-shadow:0 2px 12px rgba(43,91,132,0.08);overflow:hidden}
+#cv{display:block}
+.ax-x{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-m)}
+.ax-y{position:absolute;left:5px;top:50%;transform:translateY(-50%) rotate(-90deg);font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-m);white-space:nowrap;pointer-events:none}
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;opacity:.45}
+.empty-icon{font-size:44px}
+.empty-text{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-m);text-align:center;line-height:1.6}
+.spin{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:3px solid var(--blue-p);border-top-color:var(--blue);animation:rot .7s linear infinite}
+@keyframes rot{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+/* colorbar */
+.cbar-row{flex-shrink:0;display:flex;align-items:center;gap:8px}
+.cbar-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-m);white-space:nowrap}
+.cbar-track{flex:1;height:16px;border:1px solid var(--border);border-radius:3px;overflow:hidden}
+#cbcv{display:block;width:100%;height:100%}
+.cbar-ticks{padding-top:3px;display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text-m)}
+.info-bar{flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap}
+.ic{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-m);background:var(--bg);border:1px solid var(--border-s);border-radius:4px;padding:3px 9px}
+.ic b{color:var(--blue);font-weight:600}.py-badge{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.5px;border-radius:3px;padding:2px 7px;border:1px solid;white-space:nowrap}.py-badge.checking{background:#f3f4f6;color:#6b7280;border-color:#d1d5db}.py-badge.ready{background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7}.py-badge.fallback{background:#fff3e0;color:#e65100;border-color:#ffcc80}
+/* references */
+.refs {
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.refs-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 12px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-s);
+  cursor: pointer;
+  user-select: none;
+}
+.refs-hdr-lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 1.8px; text-transform: uppercase;
+  color: var(--blue-m);
+}
+.refs-hdr-arrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--text-m);
+  transition: transform .2s;
+}
+.refs-hdr-arrow.open { transform: rotate(180deg); }
+.refs-body {
+  padding: 8px 12px 10px;
+  display: none;
+}
+.refs-body.open { display: block; }
+.ref-item {
+  display: flex; gap: 8px; align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border-s);
+  font-size: 11px; line-height: 1.5;
+}
+.ref-item:last-child { border-bottom: none; }
+.ref-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; font-weight: 700;
+  color: var(--blue); min-width: 18px; flex-shrink: 0;
+}
+.ref-text { color: var(--text-s); }
+.ref-text a {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--blue-l);
+  text-decoration: none; word-break: break-all;
+}
+.ref-text a:hover { text-decoration: underline; }
+.ref-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; font-weight: 700;
+  background: var(--blue-p); color: var(--blue);
+  border: 1px solid rgba(43,91,132,.2);
+  border-radius: 3px; padding: 1px 5px;
+  white-space: nowrap; flex-shrink: 0;
+  align-self: flex-start; margin-top: 1px;
+}
+
+</style>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">gp<em>bayes</em>kit</div>
+  <span class="topbar-div">·</span>
+  <div class="topbar-pg">Space-Time Covariance Explorer</div>
+  <div class="topbar-r"><span class="pill">C(h, u)</span></div>
+</header>
+
+<div class="shell">
+<aside class="side">
+<div class="side-in">
+
+  <div class="pane">
+    <div class="ph">Covariance Model</div>
+    <div class="mbtns" id="mbtns">
+      <button class="mbtn on" data-m="sep"    onclick="pickModel('sep')"><span class="mbtn-n">Separable</span><span class="mbtn-s">C_s·C_t</span></button>
+      <button class="mbtn"    data-m="gne"    onclick="pickModel('gne')"><span class="mbtn-n">Gneiting</span><span class="mbtn-s">non-sep.</span></button>
+      <button class="mbtn"    data-m="ch"     onclick="pickModel('ch')"><span class="mbtn-n">Cressie-Huang</span><span class="mbtn-s">spectral</span></button>
+      <button class="mbtn"    data-m="stein"  onclick="pickModel('stein')"><span class="mbtn-n">Stein</span><span class="mbtn-s">asymmetric</span></button>
+      <button class="mbtn"    data-m="lmat"   onclick="pickModel('lmat')"><span class="mbtn-n">Lagrangian Matérn</span><span class="mbtn-s">Lagrangian</span></button>
+      <button class="mbtn"    data-m="lch"    onclick="pickModel('lch')"><span class="mbtn-n">Lagrangian CH</span><span class="mbtn-s">Lagrangian</span></button>
+    </div>
+    <div class="asym-note" id="asymNote">⚡ Asymmetric model — contour plot may be non-symmetric in u. Shown for u ≥ 0.</div>
+  </div>
+
+  <div class="pane">
+    <div class="ph">Formula</div>
+    <div class="formula" id="fbox"></div>
+  </div>
+
+  <div class="pane" id="ppane">
+    <div class="ph">Parameters</div>
+    <div id="pcontrols"></div>
+  </div>
+
+  <div class="pane">
+    <div class="ph">Axis Range</div>
+    <div class="ax-grid">
+      <div class="ax-field"><label>h<sub>max</sub> — spatial lag</label><input type="number" id="hmax" value="5" min="0.5" step="0.5"></div>
+      <div class="ax-field"><label>u<sub>max</sub> — temporal lag</label><input type="number" id="umax" value="5" min="0.5" step="0.5"></div>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div class="ph">Display</div>
+    <div class="opt-row">
+      <label class="opt-lbl"><input type="checkbox" id="chkFull" checked> All four quadrants</label>
+    </div>
+    <div class="opt-row">
+      <label class="opt-lbl"><input type="checkbox" id="chkLive"> Live update</label>
+    </div>
+    <div class="opt-row">
+      <label class="opt-lbl"><input type="checkbox" id="chkLines" checked> Contour lines</label>
+      <label class="opt-lbl"><input type="checkbox" id="chkLabels"> Labels</label>
+    </div>
+    <div class="opt-row">
+      <span class="sel-lbl">Levels</span>
+      <select id="nlevels"><option>6</option><option selected>8</option><option>10</option><option>12</option><option>16</option></select>
+      <span class="sel-lbl" style="margin-left:6px">Colormap</span>
+      <select id="cmap">
+        <option value="blues">Blues</option>
+        <option value="viridis" selected>Viridis</option>
+        <option value="plasma">Plasma</option>
+        <option value="rdbu">RdBu</option>
+      </select>
+    </div>
+    <button class="gen-btn" id="genBtn">▶  Generate Plot</button>
+  </div>
+
+</div>
+</aside>
+
+<div class="main">
+  <div class="plot-header">
+    <div class="plot-title" id="ptitle">Separable Covariance</div>
+    <div class="plot-sub"   id="psub"></div>
+    <div class="ptags" id="ptags"></div>
+  </div>
+
+  <div class="cw" id="cw">
+    <div class="empty" id="empty">
+      <div class="empty-icon">◉</div>
+      <div class="empty-text">Set parameters and click<br><strong>Generate Plot</strong></div>
+    </div>
+    <canvas id="cv"></canvas>
+    <div class="spin" id="spin"></div>
+    <div class="ax-x" id="axx" style="display:none">Spatial lag  h</div>
+    <div class="ax-y" id="axy" style="display:none">Temporal lag  u</div>
+  </div>
+
+  <div>
+    <div class="cbar-row">
+      <span class="cbar-lbl" id="cb0">0</span>
+      <div class="cbar-track"><canvas id="cbcv" height="16"></canvas></div>
+      <span class="cbar-lbl" id="cb1">C(0,0)</span>
+    </div>
+    <div class="cbar-ticks" id="cbticks"></div>
+  </div>
+
+  <div class="info-bar" id="ibar" style="display:none">
+    <div class="ic"><span class="py-badge checking" id="pyBadge">checking engine…</span></div>
+    <div class="ic" id="ic1"></div>
+    <div class="ic" id="ic2"></div>
+    <div class="ic" id="ic3"></div>
+  </div>
+
+  <!-- References -->
+  <div class="refs">
+    <div class="refs-hdr" onclick="toggleRefs()">
+      <span class="refs-hdr-lbl">References</span>
+      <span class="refs-hdr-arrow" id="refsArrow">▾</span>
+    </div>
+    <div class="refs-body" id="refsBody">
+      <div class="ref-item">
+        <span class="ref-num">[1]</span>
+        <span class="ref-tag">Separable</span>
+        <span class="ref-text">Standard product model. See, e.g., Cressie &amp; Wikle (2011). <em>Statistics for Spatio-Temporal Data.</em> Wiley.</span>
+      </div>
+      <div class="ref-item">
+        <span class="ref-num">[2]</span>
+        <span class="ref-tag">Gneiting</span>
+        <span class="ref-text">Gneiting, T. (2002). Nonseparable, Stationary Covariance Functions for Space–Time Data. <em>Journal of the American Statistical Association</em>, 97(458), 590–600.
+          <br><a href="https://doi.org/10.1198/016214502760047113" target="_blank">https://doi.org/10.1198/016214502760047113</a>
+        </span>
+      </div>
+      <div class="ref-item">
+        <span class="ref-num">[3]</span>
+        <span class="ref-tag">Cressie-Huang</span>
+        <span class="ref-text">Cressie, N., &amp; Huang, H. C. (1999). Classes of Nonseparable, Spatio-Temporal Stationary Covariance Functions. <em>Journal of the American Statistical Association</em>, 94(448), 1330–1339.
+          <br><a href="https://doi.org/10.1080/01621459.1999.10473885" target="_blank">https://doi.org/10.1080/01621459.1999.10473885</a>
+        </span>
+      </div>
+      <div class="ref-item">
+        <span class="ref-num">[4]</span>
+        <span class="ref-tag">Stein</span>
+        <span class="ref-text">Stein, M. L. (2005). Space–Time Covariance Functions. <em>Journal of the American Statistical Association</em>, 100(469), 310–321.
+          <br><a href="https://doi.org/10.1198/016214504000000854" target="_blank">https://doi.org/10.1198/016214504000000854</a>
+        </span>
+      </div>
+      <div class="ref-item">
+        <span class="ref-num">[5]</span>
+        <span class="ref-tag">Lagrangian Matérn</span>
+        <span class="ref-text" style="display:inline">Ma, P. (2025). Asymmetric Space-Time Covariance Functions via Hierarchical Mixtures. <em>arXiv:2511.07959</em>.
+          <br><a href="https://arxiv.org/abs/2511.07959" target="_blank">https://arxiv.org/abs/2511.07959</a>
+        </span>
+      </div>
+      <div class="ref-item">
+        <span class="ref-num">[6]</span>
+        <span class="ref-tag">Lagrangian CH</span>
+        <span class="ref-text">Ma, P. (2025). Asymmetric Space-Time Covariance Functions via Hierarchical Mixtures. <em>arXiv:2511.07959</em>.
+          <br><a href="https://arxiv.org/abs/2511.07959" target="_blank">https://arxiv.org/abs/2511.07959</a>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+/* === KERNEL COMPUTE === */
+const _SERVER='http://localhost:8765';
+let _serverReady=false, _pyReady=false, _pyodide=null;
+
+// Pyodide: only works on HTTPS (GitHub Pages etc.), not file://
+const _IS_HTTPS = location.protocol === 'https:';
+
+const _PY_SRC=`import numpy as np
+import scipy.special as sc
+import json as _j
+
+def _matern(r, phi, nu):
+    z = np.maximum(np.asarray(r, float), 0.0) / float(phi)
+    nu = float(nu)
+    with np.errstate(invalid='ignore', divide='ignore', over='ignore'):
+        if   nu == 0.5: out = np.exp(-z)
+        elif nu == 1.5: out = (1.0 + z) * np.exp(-z)
+        elif nu == 2.5: out = (1.0 + z + z*z/3.0) * np.exp(-z)
+        else:
+            c = (2.0 ** (1.0 - nu)) / sc.gamma(nu)
+            out = c * np.power(z, nu) * sc.kv(nu, z)
+        out = np.where(z < 1e-10, 1.0, out)
+        out = np.where(np.isfinite(out), out, 0.0)
+    return out
+
+def _ch(r, phi, nu, alpha):
+    z  = np.maximum(np.asarray(r, float), 0.0) / float(phi)
+    z2 = z * z
+    c  = np.exp(sc.gammaln(float(nu) + float(alpha)) - sc.gammaln(float(nu)))
+    with np.errstate(invalid='ignore', divide='ignore'):
+        out = c * sc.hyperu(float(alpha), float(1.0 - nu), z2)
+        out = np.where(z < 1e-10, 1.0, out)
+        out = np.where(np.isfinite(out) & (out >= 0), out, 0.0)
+    return out
+
+def compute_grid(model, h_js, u_js, params_json):
+    p = _j.loads(params_json)
+    h = np.array(list(h_js), dtype=float)
+    u = np.array(list(u_js), dtype=float)
+    H, U = np.meshgrid(h, u)
+    if model == 'sep':
+        Cs = _matern(np.abs(H), p['phi_s'], p['nu_s'])
+        Ct = _matern(np.abs(U), p['phi_t'], p['nu_t'])
+        C  = p['sigma2'] * Cs * Ct
+    elif model == 'gne':
+        absU = np.abs(U)
+        psi  = np.where(absU < 1e-10, 1.0, p['phi_t'] * absU**(2*p['alpha']) + 1.0)
+        r    = np.abs(H) / psi**(p['beta'] / 2.0)
+        C    = p['sigma2'] * psi**(-p['delta']) * _matern(r, p['phi_s'], p['nu_s'])
+    elif model == 'ch':
+        d = 2
+        absU = np.abs(U)
+        psi  = np.where(absU < 1e-10, 1.0, p['phi_t'] * absU**(2*p['alpha']) + 1.0)
+        C    = p['sigma2'] * psi**(-d/2.0) * np.exp(-H**2 / (p['phi_s']**2 * psi))
+    elif model == 'stein':
+        C = np.zeros_like(H)
+        for iy, u_val in enumerate(u):
+            nu_u  = max(0.5, p['nu'] + p['zeta'] * abs(float(u_val)))
+            r_row = np.abs(H[iy] - p['eps'] * u_val)
+            C[iy] = p['sigma2'] * _matern(r_row, p['phi'], nu_u)
+    elif model == 'lmat':
+        d = 2
+        denom = 1.0 + p['lam'] * U**2
+        scale = denom**(-d/2.0)
+        r     = np.abs(H - p['v'] * U) / np.sqrt(denom)
+        C     = p['sigma2'] * scale * _matern(r, p['phi'], p['nu'])
+    elif model == 'lch':
+        d = 2
+        denom = 1.0 + p['lam'] * U**2
+        scale = denom**(-d/2.0)
+        r     = np.abs(H - p['v'] * U) / np.sqrt(denom)
+        C     = p['sigma2'] * scale * _ch(r, p['phi'], p['nu'], p['alpha'])
+    else:
+        C = np.zeros_like(H)
+    return C.flatten().tolist()
+`;
+
+async function _probeServer(){
+  try{
+    const r=await fetch(_SERVER+'/ping',{method:'GET',signal:AbortSignal.timeout(600)});
+    if(r.ok){ _serverReady=true; return true; }
+  }catch(_){}
+  return false;
+}
+
+async function _initEngine(){
+  const badge=document.getElementById('pyBadge');
+  badge.textContent='⏳ checking engine…'; badge.className='py-badge checking';
+
+  // 1. Try local server first (works from file:// and https://)
+  if(await _probeServer()){
+    badge.textContent='✓ Python · scipy (local)'; badge.className='py-badge ready';
+    return;
+  }
+
+  // 2. Try Pyodide (only works on https://)
+  if(_IS_HTTPS){
+    badge.textContent='⏳ loading scipy…'; badge.className='py-badge checking';
+    try{
+      _pyodide=await loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'});
+      await _pyodide.loadPackage(['numpy','scipy']);
+      _pyodide.runPython(_PY_SRC);
+      _pyReady=true;
+      badge.textContent='✓ Python · scipy (Pyodide)'; badge.className='py-badge ready';
+      return;
+    }catch(e){
+      console.warn('Pyodide failed:',e);
+    }
+  }
+
+  // 3. No scipy available
+  badge.textContent='scipy required — run serve.py or open via https://'; badge.className='py-badge fallback';
+}
+
+async function _computeGrid(mk,NX,NY,hMin,hMax,uMin,uMax,p){
+  const hr=hMax-hMin, ur=uMax-uMin;
+
+  // ── local server ──────────────────────────────────────────────────────
+  if(_serverReady){
+    try{
+      const res=await fetch(_SERVER+'/compute',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:mk,NX,NY,hMin,hMax,uMin,uMax,params:p})
+      });
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const d=await res.json();
+      if(d.error) throw new Error(d.error);
+      const g=[];
+      for(let iy=0;iy<NY;iy++) g.push(d.grid.slice(iy*NX,(iy+1)*NX));
+      return g;
+    }catch(e){
+      console.warn('Server lost, retrying with next best engine:',e.message);
+      _serverReady=false;
+      // fall through — re-check Pyodide or JS
+    }
+  }
+
+  // ── Pyodide ───────────────────────────────────────────────────────────
+  if(_pyReady){
+    try{
+      const ha=Array.from({length:NX},(_,i)=>hMin+i/(NX-1)*hr);
+      const ua=Array.from({length:NY},(_,i)=>uMin+i/(NY-1)*ur);
+      _pyodide.globals.set('_mk',mk);
+      _pyodide.globals.set('_ha',ha);
+      _pyodide.globals.set('_ua',ua);
+      _pyodide.globals.set('_pj',JSON.stringify(p));
+      const res=await _pyodide.runPythonAsync(
+        'compute_grid(_mk,_ha.to_py(),_ua.to_py(),_pj)'
+      );
+      const flat=(typeof res.toJs==='function')?res.toJs():Array.from(res);
+      const g=[];
+      for(let iy=0;iy<NY;iy++) g.push(flat.slice(iy*NX,(iy+1)*NX));
+      return g;
+    }catch(e){
+      console.warn('Pyodide compute failed:',e);
+    }
+  }
+
+  // ── No scipy available ───────────────────────────────────────────────
+  throw new Error('no-scipy');
+}
+
+/* Kernels: all computation via scipy (server or Pyodide). No JS approximations. */
+
+/* ═══════════════════════════════════════════════════
+   MODELS
+═══════════════════════════════════════════════════ */
+const MODELS = {
+
+  /* 1. SEPARABLE */
+  sep: {
+    title: 'Separable Covariance',
+    sub: 'C(h, u) = σ² · C_s(h ; φ_s, ν_s) · C_t(|u| ; φ_t, ν_t)',
+    ref: 'Symmetric, separable',
+    formula: [
+      ['fc','C(h, u) = σ² · C_s(h) · C_t(|u|)'],['',''],
+      ['fm','C_s, C_t : Matérn marginal correlations'],
+      ['fm','σ² : marginal variance'],
+    ],
+    asym: false,
+    params: [
+      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',         mn:.1,mx:5,  st:.1, df:1.0},
+      {id:'phi_s', nm:'φ_s', dc:'Spatial range',              mn:.1,mx:5,  st:.1, df:1.0},
+      {id:'nu_s',  nm:'ν_s', dc:'Spatial smoothness',         mn:.5,mx:2.5,st:.5, df:1.5},
+      {id:'phi_t', nm:'φ_t', dc:'Temporal range',             mn:.1,mx:5,  st:.1, df:1.0},
+      {id:'nu_t',  nm:'ν_t', dc:'Temporal smoothness',        mn:.5,mx:2.5,st:.5, df:1.5},
+    ],
+    fn(h,u,p){ throw new Error('no-scipy'); }
+  },
+
+  /* 2. GNEITING (2002) */
+  gne: {
+    title: 'Gneiting Model',
+    sub: 'Nonseparable, fully symmetric — Gneiting (2002) JASA 97(458):590–600',
+    ref: 'Gneiting, T. (2002). JASA, 97(458), 590–600. https://doi.org/10.1198/016214502760047113',
+    formula: [
+      ['fc','C(h,u) = σ² ψ(|u|)^{-δ} · C_s( |h|/ψ(|u|)^{β/2} )'],['',''],
+      ['fc','ψ(|u|) = φ_t |u|^{2α} + 1'],
+      ['fm','β ∈ (0,1]: space-time interaction'],
+      ['fm','δ ∈ (0,1]: non-separability strength'],
+    ],
+    asym: false,
+    params: [
+      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',                   mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'phi_s', nm:'φ_s', dc:'Spatial scale',                       mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'phi_t', nm:'φ_t', dc:'Temporal scale',                      mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'nu_s',  nm:'ν',   dc:'Spatial smoothness (Matérn)',          mn:.5, mx:2.5,st:.5,  df:1.5},
+      {id:'alpha', nm:'α',   dc:'Temporal smoothness  α ∈ (0,1]',      mn:.1, mx:1,  st:.05, df:.5},
+      {id:'beta',  nm:'β',   dc:'Space-time interaction  β ∈ (0,1]',   mn:.05,mx:1,  st:.05, df:.5},
+      {id:'delta', nm:'δ',   dc:'Non-separability  δ ∈ (0,1]',         mn:.05,mx:1,  st:.05, df:.5},
+    ],
+    fn(h,u,p){ throw new Error('no-scipy'); }
+  },
+
+  /* 3. CRESSIE-HUANG (1999) */
+  ch: {
+    title: 'Cressie-Huang Covariance',
+    sub: 'Nonseparable via Fourier inversion — Cressie & Huang (1999) JASA 94(448):1330–1339',
+    ref: 'Cressie, N. & Huang, H. C. (1999). JASA, 94(448), 1330–1339. https://doi.org/10.1080/01621459.1999.10473885',
+    formula: [
+      ['fc','C(h,u) = σ²(φ_t|u|^{2α}+1)^{-d/2}'],
+      ['fc','      · exp(−‖h‖²/[φ_s²(φ_t|u|^{2α}+1)])'],['',''],
+      ['fm','d = 2 (spatial dimension fixed for plot)'],
+      ['fm','α ∈ (0,1]: temporal smoothness'],
+      ['fm','Gaussian spatial marginal; fully symmetric'],
+    ],
+    asym: false,
+    params: [
+      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',                mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'phi_s', nm:'φ_s', dc:'Spatial scale',                    mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'phi_t', nm:'φ_t', dc:'Temporal scale',                   mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'alpha', nm:'α',   dc:'Temporal smoothness  α ∈ (0,1]',  mn:.1, mx:1,  st:.05, df:.5},
+    ],
+    fn(h,u,p){ throw new Error('no-scipy'); }
+  },
+
+  /* 4. STEIN (2005) */
+  stein: {
+    title: 'Stein Covariance',
+    sub: 'Asymmetric via advection and time-varying smoothness — Stein (2005) JASA 100(469):310–321',
+    ref: 'Stein, M. L. (2005). JASA, 100(469), 310–321. https://doi.org/10.1198/016214504000000854',
+    formula: [
+      ['fc','C(h,u) = σ² · M_ν(h; ν + ζ|u|, φ)'],['',''],
+      ['fc','M_ν(r; ν(u), φ)  with'],
+      ['fc','  r  = |h − ε·u|  (advected lag)'],
+      ['fc','  ν(u) = ν + ζ|u|  (time-varying smoothness)'],['',''],
+      ['fm','ε: advection speed (asymmetry when ε ≠ 0)'],
+      ['fm','ζ ≥ 0: rate of smoothness increase with |u|'],
+    ],
+    asym: true,
+    params: [
+      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                      mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'phi',   nm:'φ',  dc:'Spatial range',                          mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'nu',    nm:'ν',  dc:'Baseline smoothness',                    mn:.5, mx:2.5,st:.5,  df:1.5},
+      {id:'eps',   nm:'ε',  dc:'Advection speed (ε=0 → symmetric in u)',mn:-2, mx:2,  st:.1,  df:.5},
+      {id:'zeta',  nm:'ζ',  dc:'Smoothness increase rate  ζ ≥ 0',        mn:0,  mx:1,  st:.05, df:0},
+    ],
+    fn(h,u,p){ throw new Error('no-scipy'); }
+  },
+
+  /* 5. LAGRANGIAN MATERN (Ma 2025, arXiv 2511.07959) */
+  lmat: {
+    title: 'Lagrangian Matérn',
+    sub: 'Lagrangian framework, Matérn marginals — Ma (2025) arXiv:2511.07959',
+    ref: 'Ma, P. (2025). Asymmetric Space-Time Covariance Functions via Hierarchical Mixtures. arXiv:2511.07959. https://arxiv.org/abs/2511.07959',
+    formula: [
+      ['fc','K(h,u) = σ²(1+λu²)^{−d/2}'],
+      ['fc','      · M_ν(|h−v·u|/√(1+λu²) ; φ)'],['',''],
+      ['fm','d = 2 (spatial dimension)'],
+      ['fm','v: mean velocity (asymmetry when v ≠ 0)'],
+      ['fm','λ > 0: temporal scale of velocity variance'],
+      ['fm','Tail: K ≍ |u|^{−d} as |u|→∞ (polynomial)'],
+    ],
+    asym: true,
+    params: [
+      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                      mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'phi',   nm:'φ',  dc:'Spatial range',                          mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'nu',    nm:'ν',  dc:'Smoothness',                             mn:.5, mx:2.5,st:.5,  df:1.5},
+      {id:'lam',   nm:'λ',  dc:'Temporal scale  λ > 0',                  mn:.05,mx:3,  st:.05, df:.5},
+      {id:'v',     nm:'v',  dc:'Mean velocity (v=0 → symmetric)',        mn:-2, mx:2,  st:.1,  df:0},
+    ],
+    fn(h,u,p){ throw new Error('no-scipy'); }
+  },
+
+  /* 6. LAGRANGIAN CH (Ma 2025, arXiv 2511.07959) */
+  lch: {
+    title: 'Lagrangian CH',
+    sub: 'Lagrangian framework, CH marginals, polynomial tails — Ma (2025) arXiv:2511.07959',
+    ref: 'Ma, P. (2025). Asymmetric Space-Time Covariance Functions via Hierarchical Mixtures. arXiv:2511.07959. https://arxiv.org/abs/2511.07959',
+    formula: [
+      ['fc','K(h,u) = σ²(1+λu²)^{−d/2}'],
+      ['fc','      · CH(|h−v·u|/√(1+λu²) ; ν,α,φ)'],['',''],
+      ['fm','CH(r;ν,α,φ) = Γ(ν+α)/Γ(ν)·U(α,1−ν,(r/φ)²)'],
+      ['fm','  ν: smoothness (origin behavior)'],
+      ['fm','  α: tail decay parameter (polynomial)'],
+      ['fm','v: mean velocity; λ: temporal scale'],
+      ['fm','Long-range dependence in space and time'],
+    ],
+    asym: true,
+    params: [
+      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                  mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'phi',   nm:'φ',  dc:'Spatial range',                      mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'nu',    nm:'ν',  dc:'Smoothness',                         mn:.5, mx:2.5,st:.5,  df:1.5},
+      {id:'alpha', nm:'α',  dc:'Tail decay  α > 0',                  mn:.1, mx:2,  st:.1,  df:.5},
+      {id:'lam',   nm:'λ',  dc:'Temporal scale  λ > 0',              mn:.05,mx:3,  st:.05, df:.5},
+      {id:'v',     nm:'v',  dc:'Mean velocity (v=0 → symmetric)',    mn:-2, mx:2,  st:.1,  df:0},
+    ],
+    fn(h,u,p){ throw new Error('no-scipy'); }
+  }
+};
+
+/* ═══════════════════════════════════════════════════
+   COLORMAPS
+═══════════════════════════════════════════════════ */
+const CMAPS = {
+  blues(t){ return [Math.round(220-t*185),Math.round(237-t*195),Math.round(255-t*100)] },
+  viridis(t){
+    const s=[[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];
+    const i=Math.min(3,Math.floor(t*4)),f=t*4-i,a=s[i],b=s[i+1];
+    return [Math.round(a[0]+(b[0]-a[0])*f),Math.round(a[1]+(b[1]-a[1])*f),Math.round(a[2]+(b[2]-a[2])*f)];
+  },
+  plasma(t){
+    const s=[[13,8,135],[126,3,168],[204,71,120],[248,149,64],[240,249,33]];
+    const i=Math.min(3,Math.floor(t*4)),f=t*4-i,a=s[i],b=s[i+1];
+    return [Math.round(a[0]+(b[0]-a[0])*f),Math.round(a[1]+(b[1]-a[1])*f),Math.round(a[2]+(b[2]-a[2])*f)];
+  },
+  rdbu(t){
+    if(t<=.5){const s=t*2;return[Math.round(33+s*(255-33)),Math.round(102+s*(255-102)),Math.round(172+s*(255-172))]}
+    const s=(t-.5)*2;return[255,Math.round(255-s*215),Math.round(255-s*229)];
+  }
+};
+function getColor(t,nm){t=Math.max(0,Math.min(1,t));return(CMAPS[nm]||CMAPS.viridis)(t)}
+
+/* ═══════════════════════════════════════════════════
+   MARCHING SQUARES
+═══════════════════════════════════════════════════ */
+function marchSq(grid,nx,ny,level){
+  const segs=[];
+  function lerp(v0,v1){return v1===v0?0:Math.max(0,Math.min(1,(level-v0)/(v1-v0)))}
+  const LUT=[[],[['L','B']],[['B','R']],[['L','R']],[['R','T']],[['L','B'],['R','T']],[['B','T']],[['L','T']],[['L','T']],[['B','T']],[['L','B'],['R','T']],[['R','T']],[['L','R']],[['B','R']],[['L','B']],[]];
+  for(let iy=0;iy<ny-1;iy++){
+    for(let ix=0;ix<nx-1;ix++){
+      const v00=grid[iy][ix],v10=grid[iy][ix+1],v01=grid[iy+1][ix],v11=grid[iy+1][ix+1];
+      const idx=(v00>=level?1:0)|(v10>=level?2:0)|(v11>=level?4:0)|(v01>=level?8:0);
+      if(idx===0||idx===15)continue;
+      const pt={B:[ix+lerp(v00,v10),iy],R:[ix+1,iy+lerp(v10,v11)],T:[ix+lerp(v01,v11),iy+1],L:[ix,iy+lerp(v00,v01)]};
+      LUT[idx].forEach(([e1,e2])=>segs.push([pt[e1],pt[e2]]));
+    }
+  }
+  return segs;
+}
+
+/* ═══════════════════════════════════════════════════
+   STATE & UI
+═══════════════════════════════════════════════════ */
+let cur='sep', pv={};
+
+function pickModel(k){
+  cur=k;
+  document.querySelectorAll('.mbtn').forEach(b=>b.classList.toggle('on',b.dataset.m===k));
+  const m=MODELS[k];
+  document.getElementById('asymNote').classList.toggle('show', m.asym);
+  buildFormula(); buildParams();
+}
+
+function buildFormula(){
+  const m=MODELS[cur];
+  document.getElementById('fbox').innerHTML=
+    `<span class="fl">C(h, u)  —  ${m.ref}</span>`+
+    m.formula.map(([cls,txt])=>txt?`<span class="${cls}">${txt}</span>`:'<br>').join('<br>');
+}
+
+function _decimals(st){
+  const s=st.toString(); const i=s.indexOf('.'); return i<0?0:s.length-i-1;
+}
+
+function buildParams(){
+  const m=MODELS[cur]; pv={};
+  const c=document.getElementById('pcontrols'); c.innerHTML='';
+  m.params.forEach(p=>{
+    pv[p.id]=p.df;
+    const dec=_decimals(p.st);
+    const fmt=v=>v.toFixed(dec);
+    const d=document.createElement('div'); d.className='param';
+    d.innerHTML=`
+      <div class="param-hd">
+        <span class="param-nm">${p.nm}</span>
+        <input type="number" class="param-vl" id="v_${p.id}" step="${p.st}" value="${fmt(p.df)}">
+        <button class="param-range-btn" title="Adjust slider range" id="rb_${p.id}">⇔</button>
+      </div>
+      <div class="param-dc">${p.dc}</div>
+      <input type="range" id="s_${p.id}" min="${p.mn}" max="${p.mx}" step="${p.st}" value="${p.df}">
+      <div class="param-range-row" id="r_${p.id}">
+        <span>min</span>
+        <input type="number" id="mn_${p.id}" value="${p.mn}" step="${p.st}">
+        <span>max</span>
+        <input type="number" id="mx_${p.id}" value="${p.mx}" step="${p.st}">
+      </div>
+    `;
+    c.appendChild(d);
+
+    const sl  = d.querySelector('input[type=range]');
+    const vi  = d.querySelector('.param-vl');
+    const mni = d.querySelector('[id^=mn_]');
+    const mxi = d.querySelector('[id^=mx_]');
+    const rr  = d.querySelector('.param-range-row');
+    const rb  = d.querySelector('.param-range-btn');
+
+    // slider → number input (also triggers live re-render)
+    sl.addEventListener('input', e=>{
+      const v=parseFloat(e.target.value);
+      pv[p.id]=v; vi.value=fmt(v);
+      if(document.getElementById('chkLive').checked) doPlot();
+    });
+
+    // number input → slider (allow out-of-range: expand slider)
+    vi.addEventListener('change', e=>{
+      let v=parseFloat(e.target.value);
+      if(isNaN(v)) return;
+      if(v < parseFloat(sl.min)){ sl.min=v; mni.value=fmt(v); }
+      if(v > parseFloat(sl.max)){ sl.max=v; mxi.value=fmt(v); }
+      pv[p.id]=v; sl.value=v; vi.value=fmt(v);
+      if(document.getElementById('chkLive').checked) doPlot();
+    });
+
+    // min/max range inputs
+    mni.addEventListener('change', e=>{
+      sl.min=parseFloat(e.target.value);
+      if(pv[p.id]<parseFloat(sl.min)){
+        pv[p.id]=parseFloat(sl.min);
+        sl.value=sl.min; vi.value=fmt(parseFloat(sl.min));
+      }
+    });
+    mxi.addEventListener('change', e=>{
+      sl.max=parseFloat(e.target.value);
+      if(pv[p.id]>parseFloat(sl.max)){
+        pv[p.id]=parseFloat(sl.max);
+        sl.value=sl.max; vi.value=fmt(parseFloat(sl.max));
+      }
+    });
+
+    // toggle range row
+    rb.addEventListener('click', ()=> rr.classList.toggle('open'));
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   PLOT
+═══════════════════════════════════════════════════ */
+function doPlot(){
+  document.getElementById('empty').style.display='none';
+  document.getElementById('spin').style.display='block';
+  _render();
+}
+
+async function _render(){
+  const cw=document.getElementById('cw'),cv=document.getElementById('cv'),spin=document.getElementById('spin');
+  const m=MODELS[cur], p={...pv};
+  const hMax=Math.max(.5,parseFloat(document.getElementById('hmax').value)||5);
+  const uMax=Math.max(.5,parseFloat(document.getElementById('umax').value)||5);
+  const cmNm=document.getElementById('cmap').value;
+  const nL=parseInt(document.getElementById('nlevels').value)||8;
+  const doLine=document.getElementById('chkLines').checked;
+  const doLbl=document.getElementById('chkLabels').checked;
+  const doFull=document.getElementById('chkFull').checked;
+
+  const hMin = doFull ? -hMax : 0;
+  const uMin = doFull ? -uMax : 0;
+  const hRange = hMax - hMin;
+  const uRange = uMax - uMin;
+
+  // wider left pad when negative tick labels present
+  const PAD={l: doFull ? 54 : 46, r:16, t:16, b:32};
+  const W=cw.clientWidth,H=cw.clientHeight;
+  cv.width=W; cv.height=H;
+  const pw=W-PAD.l-PAD.r, ph=H-PAD.t-PAD.b;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+  const NX=Math.min(400,Math.max(140,pw));
+  const NY=Math.min(400,Math.max(140,ph));
+  let grid;
+  try{
+    grid=await _computeGrid(cur,NX,NY,hMin,hMax,uMin,uMax,p);
+  }catch(e){
+    spin.style.display='none';
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#f8f9fa'; ctx.fillRect(0,0,W,H);
+    ctx.font='bold 13px IBM Plex Mono,monospace'; ctx.fillStyle='#c62828';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('scipy required',W/2,H/2-18);
+    ctx.font='11px IBM Plex Mono,monospace'; ctx.fillStyle='#5a718a';
+    ctx.fillText('Run  python serve.py  for local use,',W/2,H/2+6);
+    ctx.fillText('or open this page via https:// for Pyodide.',W/2,H/2+24);
+    _plotted=false;
+    return;
+  }
+  let vMin=Infinity,vMax=-Infinity;
+  for(let iy=0;iy<NY;iy++) for(let ix=0;ix<NX;ix++){const v=grid[iy][ix];if(v<vMin)vMin=v;if(v>vMax)vMax=v;}
+  const vR=vMax-vMin||1;
+
+  // heatmap
+  const img=ctx.createImageData(pw,ph);
+  for(let py=0;py<ph;py++){
+    const gy=((ph-1-py)/(ph-1))*(NY-1);
+    const gy0=Math.floor(gy),gy1=Math.min(NY-1,gy0+1),fy=gy-gy0;
+    for(let px=0;px<pw;px++){
+      const gx=(px/(pw-1))*(NX-1);
+      const gx0=Math.floor(gx),gx1=Math.min(NX-1,gx0+1),fx=gx-gx0;
+      const v=grid[gy0][gx0]*(1-fx)*(1-fy)+grid[gy0][gx1]*fx*(1-fy)+grid[gy1][gx0]*(1-fx)*fy+grid[gy1][gx1]*fx*fy;
+      const [r,g,b]=getColor((v-vMin)/vR,cmNm);
+      const i=(py*pw+px)*4; img.data[i]=r;img.data[i+1]=g;img.data[i+2]=b;img.data[i+3]=255;
+    }
+  }
+
+  // clip all drawing strictly to plot area
+  ctx.save();
+  ctx.beginPath(); ctx.rect(PAD.l,PAD.t,pw,ph); ctx.clip();
+  ctx.putImageData(img,PAD.l,PAD.t);
+
+  // zero-axis lines (when full quadrant view)
+  if(doFull){
+    const xZero = PAD.l + ((0-hMin)/hRange)*pw;
+    const yZero = PAD.t + ph - ((0-uMin)/uRange)*ph;
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(xZero,PAD.t); ctx.lineTo(xZero,PAD.t+ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD.l,yZero); ctx.lineTo(PAD.l+pw,yZero); ctx.stroke();
+    ctx.setLineDash([]);
+    // axis labels at origin
+    ctx.font='9px IBM Plex Mono,monospace'; ctx.fillStyle='rgba(255,255,255,.80)';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText('0',xZero,PAD.t+2);
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillText('0',PAD.l-3,yZero);
+    ctx.restore();
+  }
+
+  // contours
+  if(doLine){
+    ctx.save();
+    ctx.translate(PAD.l,PAD.t);
+    for(let li=1;li<=nL;li++){
+      const lv=vMin+(li/nL)*vR;
+      const segs=marchSq(grid,NX,NY,lv);
+      if(!segs.length)continue;
+      const t=(lv-vMin)/vR;
+      ctx.strokeStyle=t>.55?'rgba(0,30,70,.50)':'rgba(255,255,255,.60)';
+      ctx.lineWidth=.9;
+      segs.forEach(([[x0,y0],[x1,y1]])=>{
+        const px0=(x0/(NX-1))*pw,py0=(1-y0/(NY-1))*ph;
+        const px1=(x1/(NX-1))*pw,py1=(1-y1/(NY-1))*ph;
+        ctx.beginPath();ctx.moveTo(px0,py0);ctx.lineTo(px1,py1);ctx.stroke();
+      });
+      if(doLbl&&segs.length>8){
+        const mid=segs[Math.floor(segs.length/2)];
+        const mx=((mid[0][0]+mid[1][0])/2/(NX-1))*pw;
+        const my=(1-(mid[0][1]+mid[1][1])/2/(NY-1))*ph;
+        ctx.font='8.5px IBM Plex Mono,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillRect(mx-12,my-6,24,12);
+        ctx.fillStyle='#1a2a3a'; ctx.fillText(lv.toFixed(2),mx,my);
+      }
+    }
+    ctx.restore();
+  }
+  ctx.restore(); // end plot-area clip
+
+  // white masks to cover any bleed into padding
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,       0,       PAD.l,   H);
+  ctx.fillRect(PAD.l+pw,0,       PAD.r+1, H);
+  ctx.fillRect(0,       0,       W,       PAD.t);
+  ctx.fillRect(0,       PAD.t+ph,W,       PAD.b+1);
+
+  // plot border
+  ctx.strokeStyle='#c8d8e8'; ctx.lineWidth=1;
+  ctx.strokeRect(PAD.l+.5,PAD.t+.5,pw-1,ph-1);
+
+  _axes(ctx,PAD,pw,ph,hMin,hMax,uMin,uMax);
+
+  // header
+  document.getElementById('ptitle').textContent=m.title;
+  document.getElementById('psub').textContent=m.sub;
+  const tags=document.getElementById('ptags'); tags.innerHTML='';
+  m.params.slice(0,4).forEach(pm=>{
+    const t=document.createElement('span');
+    t.className='ptag'+(m.asym?' asym-tag':'');
+    t.textContent=`${pm.nm} = ${p[pm.id].toFixed(2)}`;
+    tags.appendChild(t);
+  });
+  if(m.asym){
+    const t=document.createElement('span');
+    t.className='ptag asym-tag'; t.textContent='asymmetric';
+    tags.appendChild(t);
+  }
+  document.getElementById('axx').style.display='';
+  document.getElementById('axy').style.display='';
+  _colorbar(vMin,vMax,cmNm,nL);
+  document.getElementById('ic1').innerHTML=`<b>Model:</b> ${m.title}`;
+  document.getElementById('ic2').innerHTML=`<b>Grid:</b> ${NX}×${NY}`;
+  document.getElementById('ic3').innerHTML=`<b>Symmetric:</b> ${m.asym?'no':'yes'}`;
+
+  document.getElementById('ibar').style.display='flex';
+  spin.style.display='none';
+}
+
+function _axes(ctx,PAD,pw,ph,hMin,hMax,uMin,uMax){
+  const hRange=hMax-hMin, uRange=uMax-uMin;
+  ctx.save();
+  ctx.font='10px IBM Plex Mono,monospace';
+  ctx.fillStyle='#5a718a'; ctx.strokeStyle='#c8d8e8'; ctx.lineWidth=1;
+
+  // choose nice tick count and step
+  function niceTicks(lo,hi,n){
+    const raw=(hi-lo)/n, exp=Math.pow(10,Math.floor(Math.log10(raw)));
+    const step=[1,2,2.5,5,10].map(f=>f*exp).find(s=>s>=raw)||exp*10;
+    const ticks=[];
+    for(let v=Math.ceil(lo/step)*step; v<=hi+1e-9; v+=step) ticks.push(+v.toFixed(10));
+    return ticks;
+  }
+
+  const hTicks=niceTicks(hMin,hMax,6);
+  const uTicks=niceTicks(uMin,uMax,5);
+
+  // x ticks
+  ctx.textAlign='center';
+  hTicks.forEach(v=>{
+    const x=PAD.l+((v-hMin)/hRange)*pw;
+    ctx.beginPath();ctx.moveTo(x,PAD.t+ph);ctx.lineTo(x,PAD.t+ph+4);ctx.stroke();
+    // skip 0 label if already drawn via zero-line
+    ctx.fillText(v===0?'0':v%1===0?v.toFixed(0):v.toFixed(1),x,PAD.t+ph+15);
+  });
+  // y ticks
+  ctx.textAlign='right';
+  uTicks.forEach(v=>{
+    const y=PAD.t+ph-((v-uMin)/uRange)*ph;
+    ctx.beginPath();ctx.moveTo(PAD.l-4,y);ctx.lineTo(PAD.l,y);ctx.stroke();
+    ctx.fillText(v===0?'0':v%1===0?v.toFixed(0):v.toFixed(1),PAD.l-7,y+3);
+  });
+
+  // grid lines
+  ctx.strokeStyle='rgba(200,216,232,.35)';ctx.lineWidth=.5;ctx.setLineDash([3,4]);
+  hTicks.forEach(v=>{
+    if(v===hMin||v===hMax)return;
+    const x=PAD.l+((v-hMin)/hRange)*pw;
+    ctx.beginPath();ctx.moveTo(x,PAD.t);ctx.lineTo(x,PAD.t+ph);ctx.stroke();
+  });
+  uTicks.forEach(v=>{
+    if(v===uMin||v===uMax)return;
+    const y=PAD.t+ph-((v-uMin)/uRange)*ph;
+    ctx.beginPath();ctx.moveTo(PAD.l,y);ctx.lineTo(PAD.l+pw,y);ctx.stroke();
+  });
+  ctx.setLineDash([]);ctx.restore();
+}
+
+function _colorbar(vMin,vMax,cmNm,nL){
+  const cv2=document.getElementById('cbcv');
+  cv2.width=cv2.parentElement.clientWidth||400;
+  const ctx=cv2.getContext('2d'),W=cv2.width;
+  for(let x=0;x<W;x++){const[r,g,b]=getColor(x/(W-1),cmNm);ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fillRect(x,0,1,cv2.height)}
+  const ticks=document.getElementById('cbticks'); ticks.innerHTML='';
+  for(let i=0;i<=4;i++){const s=document.createElement('span');s.textContent=(vMin+(i/4)*(vMax-vMin)).toFixed(3);ticks.appendChild(s)}
+  document.getElementById('cb0').textContent=vMin.toFixed(3);
+  document.getElementById('cb1').textContent=`C(0,0) = ${vMax.toFixed(3)}`;
+}
+
+/* init */
+buildFormula(); buildParams();
+let _plotted=false;
+document.getElementById('genBtn').addEventListener('click',()=>{_plotted=true;doPlot()});
+window.addEventListener('resize',()=>{if(_plotted)_render()});
+
+function toggleRefs(){
+  const body=document.getElementById('refsBody');
+  const arrow=document.getElementById('refsArrow');
+  const open=body.classList.toggle('open');
+  arrow.classList.toggle('open',open);
+}
+</script>
+</body>
+</html>
