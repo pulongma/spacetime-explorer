@@ -245,6 +245,9 @@ select:focus{border-color:var(--blue-m)}
       <label class="opt-lbl"><input type="checkbox" id="chkLabels"> Labels</label>
     </div>
     <div class="opt-row">
+      <label class="opt-lbl"><input type="checkbox" id="chkVmin0"> Fix color min = 0</label>
+    </div>
+    <div class="opt-row">
       <span class="sel-lbl">Levels</span>
       <select id="nlevels"><option>6</option><option selected>8</option><option>10</option><option>12</option><option>16</option></select>
       <span class="sel-lbl" style="margin-left:6px">Colormap</span>
@@ -407,12 +410,13 @@ def _ch(r, phi, nu, alpha):
     # U(a, b, z) is well-defined for all real b; scipy handles negative b correctly.
     # Explicit case: C(0) = 1 by definition.
     r  = np.asarray(r, float)
-    z2 = np.maximum(r, 0.0) ** 2 / float(phi) ** 2
+    z  = np.maximum(r, 0.0) / float(phi)
+    z2 = z * z
     c  = np.exp(sc.gammaln(float(nu) + float(alpha)) - sc.gammaln(float(nu)))
-    #with np.errstate(invalid='ignore', divide='ignore'):
-    out = c * sc.hyperu(float(alpha), float(1.0 - nu), z2)
-    out = np.where(r == 0.0, 1.0, out)
-    #out = np.where(np.isfinite(out) & (out >= 0), out, 0.0)
+    with np.errstate(invalid='ignore', divide='ignore'):
+        out = c * sc.hyperu(float(alpha), float(1.0 - nu), z2)
+        out = np.where(r == 0.0, 1.0, out)
+        out = np.where(np.isfinite(out) & (out >= 0), out, 0.0)
     return out
 
 def compute_grid(model, h_js, u_js, params_json):
@@ -844,6 +848,7 @@ async function _render(){
   const doLine=document.getElementById('chkLines').checked;
   const doLbl=document.getElementById('chkLabels').checked;
   const doFull=document.getElementById('chkFull').checked;
+  const vmin0=document.getElementById('chkVmin0').checked;
 
   const hMin = doFull ? -hMax : 0;
   const uMin = doFull ? -uMax : 0;
@@ -878,7 +883,7 @@ async function _render(){
     _plotted=false;
     return;
   }
-  _paint(ctx,W,H,grid,NX,NY,{hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS,PAD});
+  _paint(ctx,W,H,grid,NX,NY,{hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS,PAD,vmin0});
 
   document.getElementById('ptitle').textContent=m.title;
   document.getElementById('psub').textContent=m.sub;
@@ -911,9 +916,10 @@ function _gridRange(grid,NX,NY){
 }
 
 function _paint(ctx,W,H,grid,NX,NY,dp){
-  const {hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS,PAD}=dp;
+  const {hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS,PAD,vmin0}=dp;
   const pw=W-PAD.l-PAD.r, ph=H-PAD.t-PAD.b;
-  const {vMin,vMax}=_gridRange(grid,NX,NY);
+  let {vMin,vMax}=_gridRange(grid,NX,NY);
+  if(vmin0) vMin=0;
   const vR=vMax-vMin||1;
 
   ctx.clearRect(0,0,W,H);
@@ -1039,6 +1045,7 @@ async function _saveHiRes(){
     const doLine=document.getElementById('chkLines').checked;
     const doLbl=document.getElementById('chkLabels').checked;
     const doFull=document.getElementById('chkFull').checked;
+    const vmin0=document.getElementById('chkVmin0').checked;
     const hMin=doFull?-hMax:0, uMin=doFull?-uMax:0;
     const hRange=hMax-hMin, uRange=uMax-uMin;
 
@@ -1073,7 +1080,7 @@ async function _saveHiRes(){
     const oc=document.createElement('canvas');
     oc.width=W; oc.height=H;
     const ctx=oc.getContext('2d');
-    _paint(ctx,W,H,grid,NX,NY,{hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS:FShi,PAD});
+    _paint(ctx,W,H,grid,NX,NY,{hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS:FShi,PAD,vmin0});
 
     // Get PNG blob, inject 300 DPI pHYs chunk
     oc.toBlob(async blob=>{
