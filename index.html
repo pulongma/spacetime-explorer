@@ -186,7 +186,7 @@ select:focus{border-color:var(--blue-m)}
 }
 
 </style>
-<script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
 </head>
 <body>
 
@@ -447,7 +447,7 @@ async function _initEngine(){
   if(_IS_HTTPS){
     badge.textContent='⏳ loading scipy…'; badge.className='py-badge checking';
     try{
-      _pyodide=await loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/'});
+      _pyodide=await loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/'});
       await _pyodide.loadPackage(['numpy','scipy']);
       _pyodide.runPython(_PY_SRC);
       _pyReady=true;
@@ -490,14 +490,13 @@ async function _computeGrid(mk,NX,NY,hMin,hMax,uMin,uMax,p){
     try{
       const ha=Array.from({length:NX},(_,i)=>hMin+i/(NX-1)*hr);
       const ua=Array.from({length:NY},(_,i)=>uMin+i/(NY-1)*ur);
-      _pyodide.globals.set('_mk',mk);
-      _pyodide.globals.set('_ha',ha);
-      _pyodide.globals.set('_ua',ua);
-      _pyodide.globals.set('_pj',JSON.stringify(p));
-      const res=await _pyodide.runPythonAsync(
-        'compute_grid(_mk,_ha.to_py(),_ua.to_py(),_pj)'
+      // Pass everything as JSON strings — avoids JsProxy/toJs issues across versions
+      const payload = JSON.stringify({model:mk,h:ha,u:ua,params:p});
+      _pyodide.globals.set('_payload', payload);
+      const res = await _pyodide.runPythonAsync(
+        'import json as _jj; _d=_jj.loads(_payload); compute_grid(_d["model"],_d["h"],_d["u"],_jj.dumps(_d["params"]))'
       );
-      const flat=(typeof res.toJs==='function')?res.toJs():Array.from(res);
+      const flat = res.toJs ? res.toJs() : Array.from(res);
       const g=[];
       for(let iy=0;iy<NY;iy++) g.push(flat.slice(iy*NX,(iy+1)*NX));
       return g;
@@ -1016,6 +1015,8 @@ function _colorbar(vMin,vMax,cmNm,nL){
 
 /* init */
 buildFormula(); buildParams();
+document.getElementById('ibar').style.display='flex';
+_initEngine();
 let _plotted=false;
 document.getElementById('genBtn').addEventListener('click',()=>{_plotted=true;doPlot()});
 window.addEventListener('resize',()=>{if(_plotted)_render()});
