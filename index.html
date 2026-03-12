@@ -211,7 +211,7 @@ select:focus{border-color:var(--blue-m)}
       <button class="mbtn"    data-m="lmat"   onclick="pickModel('lmat')"><span class="mbtn-n">Lagrangian Matérn</span><span class="mbtn-s">Lagrangian</span></button>
       <button class="mbtn"    data-m="lch"    onclick="pickModel('lch')"><span class="mbtn-n">Lagrangian CH</span><span class="mbtn-s">Lagrangian</span></button>
     </div>
-    <div class="asym-note" id="asymNote">⚡ Asymmetric model — contour plot may be non-symmetric in u. Shown for u ≥ 0.</div>
+    <div class="asym-note" id="asymNote">⚡ Asymmetric model — contours need not be symmetric in u. With ‘All four quadrants’ checked, both positive and negative temporal lags are shown.</div>
   </div>
 
   <div class="pane">
@@ -407,16 +407,34 @@ def _matern(r, phi, nu):
 
 def _ch(r, phi, nu, alpha):
     # C(r) = Γ(ν+α)/Γ(ν) · U(α, 1−ν, (r/φ)²)
-    # U(a, b, z) is well-defined for all real b; scipy handles negative b correctly.
-    # Explicit case: C(0) = 1 by definition.
+    # Numerical fix:
+    #   do not hard-zero non-finite / slightly negative values, because that creates
+    #   artificial flat regions in the heatmap. Use an asymptotic fallback instead.
     r  = np.asarray(r, float)
     z  = np.maximum(r, 0.0) / float(phi)
     z2 = z * z
-    c  = np.exp(sc.gammaln(float(nu) + float(alpha)) - sc.gammaln(float(nu)))
-    with np.errstate(invalid='ignore', divide='ignore'):
-        out = c * sc.hyperu(float(alpha), float(1.0 - nu), z2)
-        out = np.where(r == 0.0, 1.0, out)
-        out = np.where(np.isfinite(out) & (out >= 0), out, 0.0)
+    a  = float(alpha)
+    nu = float(nu)
+    c  = np.exp(sc.gammaln(nu + a) - sc.gammaln(nu))
+    with np.errstate(invalid='ignore', divide='ignore', over='ignore', under='ignore'):
+        out = c * sc.hyperu(a, 1.0 - nu, z2)
+
+    # large-z asymptotic: U(a,b,z) ~ z^{-a}
+    large = z2 > 1.0e6
+    if np.any(large):
+        out = np.asarray(out, float)
+        out[large] = c * np.power(z2[large], -a)
+
+    bad = ~np.isfinite(out)
+    if np.any(bad):
+        out = np.asarray(out, float)
+        out[bad] = c * np.power(np.maximum(z2[bad], 1.0e-12), -a)
+
+    # clip only tiny numerical negatives
+    out = np.where(out < -1.0e-12, np.nan, out)
+    out = np.where(np.isnan(out), c * np.power(np.maximum(z2, 1.0e-12), -a), out)
+    out = np.where(out < 0.0, 0.0, out)
+    out = np.where(r == 0.0, 1.0, out)
     return out
 
 def compute_grid(model, h_js, u_js, params_json):
@@ -564,11 +582,11 @@ const MODELS = {
     ],
     asym: false,
     params: [
-      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',         mn:.1,mx:5,  st:.1, df:1.0},
-      {id:'phi_s', nm:'φ_s', dc:'Spatial range',              mn:.1,mx:5,  st:.1, df:1.0},
-      {id:'nu_s',  nm:'ν_s', dc:'Spatial smoothness',         mn:.5,mx:2.5,st:.5, df:1.5},
-      {id:'phi_t', nm:'φ_t', dc:'Temporal range',             mn:.1,mx:5,  st:.1, df:1.0},
-      {id:'nu_t',  nm:'ν_t', dc:'Temporal smoothness',        mn:.5,mx:2.5,st:.5, df:1.5},
+      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',         mn:.1,mx:8,  st:.1, df:1.0},
+      {id:'phi_s', nm:'φ_s', dc:'Spatial range',              mn:.1,mx:8,  st:.1, df:1.0},
+      {id:'nu_s',  nm:'ν_s', dc:'Spatial smoothness',         mn:.5,mx:4.0,st:.5, df:1.5},
+      {id:'phi_t', nm:'φ_t', dc:'Temporal range',             mn:.1,mx:8,  st:.1, df:1.0},
+      {id:'nu_t',  nm:'ν_t', dc:'Temporal smoothness',        mn:.5,mx:4.0,st:.5, df:1.5},
     ],
     fn(h,u,p){ throw new Error('no-scipy'); }
   },
@@ -586,11 +604,11 @@ const MODELS = {
     ],
     asym: false,
     params: [
-      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',                   mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'phi_s', nm:'φ_s', dc:'Spatial scale',                       mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'phi_t', nm:'φ_t', dc:'Temporal scale',                      mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'nu_s',  nm:'ν',   dc:'Spatial smoothness (Matérn)',          mn:.5, mx:2.5,st:.5,  df:1.5},
-      {id:'alpha', nm:'α',   dc:'Temporal smoothness  α ∈ (0,1]',      mn:.1, mx:1,  st:.05, df:.5},
+      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',                   mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'phi_s', nm:'φ_s', dc:'Spatial scale',                       mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'phi_t', nm:'φ_t', dc:'Temporal scale',                      mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'nu_s',  nm:'ν',   dc:'Spatial smoothness (Matérn)',          mn:.5, mx:4.0,st:.5,  df:1.5},
+      {id:'alpha', nm:'α',   dc:'Temporal smoothness  α ∈ (0,1]',      mn:.1, mx:1,  st:.05, df:1.0},
       {id:'beta',  nm:'β',   dc:'Space-time interaction  β ∈ (0,1]',   mn:.05,mx:1,  st:.05, df:.5},
       {id:'delta', nm:'δ',   dc:'Non-separability  δ ∈ (0,1]',         mn:.05,mx:1,  st:.05, df:.5},
     ],
@@ -611,10 +629,10 @@ const MODELS = {
     ],
     asym: false,
     params: [
-      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',                mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'phi_s', nm:'φ_s', dc:'Spatial scale',                    mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'phi_t', nm:'φ_t', dc:'Temporal scale',                   mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'alpha', nm:'α',   dc:'Temporal smoothness  α ∈ (0,1]',  mn:.1, mx:1,  st:.05, df:.5},
+      {id:'sigma2',nm:'σ²',  dc:'Marginal variance',                mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'phi_s', nm:'φ_s', dc:'Spatial scale',                    mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'phi_t', nm:'φ_t', dc:'Temporal scale',                   mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'alpha', nm:'α',   dc:'Temporal smoothness  α ∈ (0,1]',  mn:.1, mx:1,  st:.05, df:1.0},
     ],
     fn(h,u,p){ throw new Error('no-scipy'); }
   },
@@ -634,11 +652,11 @@ const MODELS = {
     ],
     asym: true,
     params: [
-      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                      mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'phi',   nm:'φ',  dc:'Spatial range',                          mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'nu',    nm:'ν',  dc:'Baseline smoothness',                    mn:.5, mx:2.5,st:.5,  df:1.5},
-      {id:'eps',   nm:'ε',  dc:'Advection speed (ε=0 → symmetric in u)',mn:-2, mx:2,  st:.1,  df:.5},
-      {id:'zeta',  nm:'ζ',  dc:'Smoothness increase rate  ζ ≥ 0',        mn:0,  mx:1,  st:.05, df:0},
+      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                      mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'phi',   nm:'φ',  dc:'Spatial range',                          mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'nu',    nm:'ν',  dc:'Baseline smoothness',                    mn:.5, mx:4.0,st:.5,  df:1.5},
+      {id:'eps',   nm:'ε',  dc:'Advection speed (ε=0 → symmetric in u)',mn:-3, mx:3,  st:.1,  df:.5},
+      {id:'zeta',  nm:'ζ',  dc:'Smoothness increase rate  ζ ≥ 0',        mn:0,  mx:2,  st:.05, df:0},
     ],
     fn(h,u,p){ throw new Error('no-scipy'); }
   },
@@ -658,11 +676,11 @@ const MODELS = {
     ],
     asym: true,
     params: [
-      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                      mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'phi',   nm:'φ',  dc:'Spatial range',                          mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'nu',    nm:'ν',  dc:'Smoothness',                             mn:.5, mx:2.5,st:.5,  df:1.5},
-      {id:'lam',   nm:'λ',  dc:'Temporal scale  λ > 0',                  mn:.05,mx:3,  st:.05, df:.5},
-      {id:'v',     nm:'v',  dc:'Mean velocity (v=0 → symmetric)',        mn:-2, mx:2,  st:.1,  df:0},
+      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                      mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'phi',   nm:'φ',  dc:'Spatial range',                          mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'nu',    nm:'ν',  dc:'Smoothness',                             mn:.5, mx:4.0,st:.5,  df:1.5},
+      {id:'lam',   nm:'λ',  dc:'Temporal scale  λ > 0',                  mn:.05,mx:5,  st:.05, df:.5},
+      {id:'v',     nm:'v',  dc:'Mean velocity (v=0 → symmetric)',        mn:-3, mx:3,  st:.1,  df:0},
     ],
     fn(h,u,p){ throw new Error('no-scipy'); }
   },
@@ -680,15 +698,16 @@ const MODELS = {
       ['fm','  α: tail decay parameter (polynomial)'],
       ['fm','v: mean velocity; λ: temporal scale'],
       ['fm','Long-range dependence in space and time'],
+      ['fm','For a correlation plot, use color min = 0 to avoid misleading autoscaling.'],
     ],
     asym: true,
     params: [
-      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                  mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'phi',   nm:'φ',  dc:'Spatial range',                      mn:.1, mx:5,  st:.1,  df:1.0},
-      {id:'nu',    nm:'ν',  dc:'Smoothness',                         mn:.5, mx:2.5,st:.5,  df:1.5},
-      {id:'alpha', nm:'α',  dc:'Tail decay  α > 0',                  mn:.1, mx:2,  st:.1,  df:.5},
-      {id:'lam',   nm:'λ',  dc:'Temporal scale  λ > 0',              mn:.05,mx:3,  st:.05, df:.5},
-      {id:'v',     nm:'v',  dc:'Mean velocity (v=0 → symmetric)',    mn:-2, mx:2,  st:.1,  df:0},
+      {id:'sigma2',nm:'σ²', dc:'Marginal variance',                  mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'phi',   nm:'φ',  dc:'Spatial range',                      mn:.1, mx:8,  st:.1,  df:1.0},
+      {id:'nu',    nm:'ν',  dc:'Smoothness',                         mn:.5, mx:4.0,st:.5,  df:1.5},
+      {id:'alpha', nm:'α',  dc:'Tail decay  α > 0',                  mn:.1, mx:5,  st:.1,  df:1.0},
+      {id:'lam',   nm:'λ',  dc:'Temporal scale  λ > 0',              mn:.05,mx:5,  st:.05, df:.5},
+      {id:'v',     nm:'v',  dc:'Mean velocity (v=0 → symmetric)',    mn:-3, mx:3,  st:.1,  df:0},
     ],
     fn(h,u,p){ throw new Error('no-scipy'); }
   }
@@ -900,7 +919,8 @@ async function _render(){
     tags.appendChild(t);
   }
   const {vMin:vm0,vMax:vm1}=_gridRange(grid,NX,NY);
-  _colorbar(vm0,vm1,cmNm,nL);
+  const cbMin = vmin0 ? 0 : vm0;
+  _colorbar(cbMin,vm1,cmNm,nL);
   document.getElementById('ic1').innerHTML=`<b>Model:</b> ${m.title}`;
   document.getElementById('ic2').innerHTML=`<b>Grid:</b> ${NX}×${NY}`;
   document.getElementById('ic3').innerHTML=`<b>Symmetric:</b> ${m.asym?'no':'yes'}`;
@@ -966,7 +986,7 @@ function _paint(ctx,W,H,grid,NX,NY,dp){
   if(doLine){
     ctx.save();
     ctx.translate(PAD.l,PAD.t);
-    for(let li=1;li<=nL;li++){
+    for(let li=0;li<=nL;li++){
       const lv=vMin+(li/nL)*vR;
       const segs=marchSq(grid,NX,NY,lv);
       if(!segs.length)continue;
