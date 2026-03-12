@@ -401,6 +401,8 @@ def _matern(r, phi, nu):
     return out
 
 def _ch(r, phi, nu, alpha):
+    # C(r) = Γ(ν+α)/Γ(ν) · U(α, 1−ν, (r/φ)²)
+    # U(a, b, z) is well-defined for all real b; scipy handles negative b correctly.
     z  = np.maximum(np.asarray(r, float), 0.0) / float(phi)
     z2 = z * z
     c  = np.exp(sc.gammaln(float(nu) + float(alpha)) - sc.gammaln(float(nu)))
