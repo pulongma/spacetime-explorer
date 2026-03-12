@@ -104,7 +104,7 @@ select:focus{border-color:var(--blue-m)}
 .asym-tag{background:#fffbe6;color:#8a5c00;border-color:#ffe08a}
 
 /* canvas wrap */
-.cw{flex:1;min-height:0;position:relative;background:var(--bg);border:1px solid var(--border);border-radius:6px;box-shadow:0 2px 12px rgba(43,91,132,0.08);overflow:hidden}
+.cw{position:relative;background:var(--bg);border:1px solid var(--border);border-radius:6px;box-shadow:0 2px 12px rgba(43,91,132,0.08);overflow:hidden;width:100%;box-sizing:border-box;transition:height .15s}
 #cv{display:block}
 .ax-x{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-m)}
 .ax-y{position:absolute;left:5px;top:50%;transform:translateY(-50%) rotate(-90deg);font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-m);white-space:nowrap;pointer-events:none}
@@ -254,8 +254,36 @@ select:focus{border-color:var(--blue-m)}
         <option value="plasma">Plasma</option>
         <option value="rdbu">RdBu</option>
       </select>
+      <span class="sel-lbl" style="margin-top:6px;display:block">Font size</span>
+      <select id="fontsize">
+        <option value="screen" selected>Screen</option>
+        <option value="medium">Medium</option>
+        <option value="large">Large</option>
+        <option value="pub">Publication</option>
+      </select>
+      <span class="sel-lbl" style="margin-top:6px;display:block">Aspect ratio</span>
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+        <select id="aspectPreset" style="flex:1;min-width:0">
+          <option value="fill" selected>Fill window</option>
+          <option value="1:1">1 : 1 (square)</option>
+          <option value="4:3">4 : 3</option>
+          <option value="3:2">3 : 2</option>
+          <option value="16:9">16 : 9 (wide)</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div id="aspectCustomRow" style="display:none;align-items:center;gap:4px;margin-top:4px">
+        <input type="number" id="arW" min="1" max="20" step="0.5" value="4"
+               style="width:46px;padding:3px 5px;border:1px solid var(--border);border-radius:3px;
+                      font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg-1);">
+        <span class="sel-lbl">:</span>
+        <input type="number" id="arH" min="1" max="20" step="0.5" value="3"
+               style="width:46px;padding:3px 5px;border:1px solid var(--border);border-radius:3px;
+                      font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg-1);">
+      </div>
     </div>
     <button class="gen-btn" id="genBtn">▶  Generate Plot</button>
+    <button class="gen-btn" id="saveBtn" style="margin-top:6px;background:var(--blue-m)">⬇  Save as PNG</button>
   </div>
 
 </div>
@@ -275,8 +303,7 @@ select:focus{border-color:var(--blue-m)}
     </div>
     <canvas id="cv"></canvas>
     <div class="spin" id="spin"></div>
-    <div class="ax-x" id="axx" style="display:none">Spatial lag  h</div>
-    <div class="ax-y" id="axy" style="display:none">Temporal lag  u</div>
+    <!-- axis labels drawn on canvas -->
   </div>
 
   <div>
@@ -818,17 +845,19 @@ async function _render(){
   const hRange = hMax - hMin;
   const uRange = uMax - uMin;
 
-  // wider left pad when negative tick labels present
-  const PAD={l: doFull ? 54 : 46, r:16, t:16, b:32};
+  // font-size presets for publication-quality export
+  const _FS = document.getElementById('fontsize').value;
+  const FS = {screen:{tick:10,axlabel:11,pad:{l:doFull?54:46,r:16,t:16,b:38}},
+              medium:{tick:13,axlabel:14,pad:{l:doFull?68:58,r:20,t:20,b:50}},
+              large: {tick:16,axlabel:17,pad:{l:doFull?82:70,r:24,t:24,b:62}},
+              pub:   {tick:20,axlabel:21,pad:{l:doFull?98:84,r:28,t:28,b:78}}}[_FS]||{};
+  const PAD = FS.pad;
   const W=cw.clientWidth,H=cw.clientHeight;
   cv.width=W; cv.height=H;
-  const pw=W-PAD.l-PAD.r, ph=H-PAD.t-PAD.b;
   const ctx=cv.getContext('2d');
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
 
-  const NX=Math.min(400,Math.max(140,pw));
-  const NY=Math.min(400,Math.max(140,ph));
+  const NX=Math.min(400,Math.max(140,W-PAD.l-PAD.r));
+  const NY=Math.min(400,Math.max(140,H-PAD.t-PAD.b));
   let grid;
   try{
     grid=await _computeGrid(cur,NX,NY,hMin,hMax,uMin,uMax,p);
@@ -844,9 +873,46 @@ async function _render(){
     _plotted=false;
     return;
   }
+  _paint(ctx,W,H,grid,NX,NY,{hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS,PAD});
+
+  document.getElementById('ptitle').textContent=m.title;
+  document.getElementById('psub').textContent=m.sub;
+  const tags=document.getElementById('ptags'); tags.innerHTML='';
+  m.params.slice(0,4).forEach(pm=>{
+    const t=document.createElement('span');
+    t.className='ptag'+(m.asym?' asym-tag':'');
+    t.textContent=`${pm.nm} = ${p[pm.id].toFixed(2)}`;
+    tags.appendChild(t);
+  });
+  if(m.asym){
+    const t=document.createElement('span');
+    t.className='ptag asym-tag'; t.textContent='asymmetric';
+    tags.appendChild(t);
+  }
+  const {vMin:vm0,vMax:vm1}=_gridRange(grid,NX,NY);
+  _colorbar(vm0,vm1,cmNm,nL);
+  document.getElementById('ic1').innerHTML=`<b>Model:</b> ${m.title}`;
+  document.getElementById('ic2').innerHTML=`<b>Grid:</b> ${NX}×${NY}`;
+  document.getElementById('ic3').innerHTML=`<b>Symmetric:</b> ${m.asym?'no':'yes'}`;
+
+  document.getElementById('ibar').style.display='flex';
+  spin.style.display='none';
+}
+
+function _gridRange(grid,NX,NY){
   let vMin=Infinity,vMax=-Infinity;
   for(let iy=0;iy<NY;iy++) for(let ix=0;ix<NX;ix++){const v=grid[iy][ix];if(v<vMin)vMin=v;if(v>vMax)vMax=v;}
+  return {vMin,vMax};
+}
+
+function _paint(ctx,W,H,grid,NX,NY,dp){
+  const {hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS,PAD}=dp;
+  const pw=W-PAD.l-PAD.r, ph=H-PAD.t-PAD.b;
+  const {vMin,vMax}=_gridRange(grid,NX,NY);
   const vR=vMax-vMin||1;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
 
   // heatmap
   const img=ctx.createImageData(pw,ph);
@@ -877,7 +943,7 @@ async function _render(){
     ctx.beginPath(); ctx.moveTo(PAD.l,yZero); ctx.lineTo(PAD.l+pw,yZero); ctx.stroke();
     ctx.setLineDash([]);
     // axis labels at origin
-    ctx.font='9px IBM Plex Mono,monospace'; ctx.fillStyle='rgba(255,255,255,.80)';
+    ctx.font=Math.round(FS.tick*0.9)+'px IBM Plex Mono,monospace'; ctx.fillStyle='rgba(255,255,255,.80)';
     ctx.textAlign='center'; ctx.textBaseline='top';
     ctx.fillText('0',xZero,PAD.t+2);
     ctx.textAlign='right'; ctx.textBaseline='middle';
@@ -905,7 +971,7 @@ async function _render(){
         const mid=segs[Math.floor(segs.length/2)];
         const mx=((mid[0][0]+mid[1][0])/2/(NX-1))*pw;
         const my=(1-(mid[0][1]+mid[1][1])/2/(NY-1))*ph;
-        ctx.font='8.5px IBM Plex Mono,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.font=Math.round(FS.tick*0.85)+'px IBM Plex Mono,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillRect(mx-12,my-6,24,12);
         ctx.fillStyle='#1a2a3a'; ctx.fillText(lv.toFixed(2),mx,my);
       }
@@ -925,41 +991,111 @@ async function _render(){
   ctx.strokeStyle='#c8d8e8'; ctx.lineWidth=1;
   ctx.strokeRect(PAD.l+.5,PAD.t+.5,pw-1,ph-1);
 
-  _axes(ctx,PAD,pw,ph,hMin,hMax,uMin,uMax);
+  _axes(ctx,PAD,pw,ph,hMin,hMax,uMin,uMax,FS);
+} // end _paint
 
-  // header
-  document.getElementById('ptitle').textContent=m.title;
-  document.getElementById('psub').textContent=m.sub;
-  const tags=document.getElementById('ptags'); tags.innerHTML='';
-  m.params.slice(0,4).forEach(pm=>{
-    const t=document.createElement('span');
-    t.className='ptag'+(m.asym?' asym-tag':'');
-    t.textContent=`${pm.nm} = ${p[pm.id].toFixed(2)}`;
-    tags.appendChild(t);
-  });
-  if(m.asym){
-    const t=document.createElement('span');
-    t.className='ptag asym-tag'; t.textContent='asymmetric';
-    tags.appendChild(t);
-  }
-  document.getElementById('axx').style.display='';
-  document.getElementById('axy').style.display='';
-  _colorbar(vMin,vMax,cmNm,nL);
-  document.getElementById('ic1').innerHTML=`<b>Model:</b> ${m.title}`;
-  document.getElementById('ic2').innerHTML=`<b>Grid:</b> ${NX}×${NY}`;
-  document.getElementById('ic3').innerHTML=`<b>Symmetric:</b> ${m.asym?'no':'yes'}`;
+// ── high-resolution PNG save (≥300 DPI) ────────────────────────────────────
 
-  document.getElementById('ibar').style.display='flex';
-  spin.style.display='none';
+/* Inject pHYs chunk into a PNG ArrayBuffer so readers see correct DPI.
+   300 DPI = 11811 pixels/metre  */
+function _setPngDpi(arrayBuf, dpi){
+  const ppm = Math.round(dpi / 0.0254);          // pixels per metre
+  const src = new Uint8Array(arrayBuf);
+  // Build pHYs chunk: 4-byte len + "pHYs" + 4+4+1 data + 4-byte CRC
+  function u32be(v){return [(v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255];}
+  const data=[...u32be(ppm),...u32be(ppm),1];     // x, y, unit=metre
+  const type=[112,72,89,115];                      // "pHYs"
+  // CRC32 over type+data
+  let crc=0xFFFFFFFF;
+  const tab=new Int32Array(256);
+  for(let i=0;i<256;i++){let c=i;for(let k=0;k<8;k++)c=c&1?(0xEDB88320^(c>>>1)):(c>>>1);tab[i]=c;}
+  for(const b of [...type,...data]) crc=(tab[(crc^b)&0xFF]^(crc>>>8));
+  crc=(crc^0xFFFFFFFF)>>>0;
+  const chunk=new Uint8Array([0,0,0,9,...type,...data,...u32be(crc)]);
+  // Insert after IHDR chunk (8 sig + 25 IHDR = byte 33)
+  const out=new Uint8Array(src.length+chunk.length);
+  out.set(src.slice(0,33));
+  out.set(chunk,33);
+  out.set(src.slice(33),33+chunk.length);
+  return out.buffer;
 }
 
-function _axes(ctx,PAD,pw,ph,hMin,hMax,uMin,uMax){
+async function _saveHiRes(){
+  if(!_plotted){alert('Generate a plot first.');return;}
+  const btn=document.getElementById('saveBtn');
+  const orig=btn.textContent; btn.textContent='⏳ rendering…'; btn.disabled=true;
+
+  try{
+    const m=MODELS[cur], p={...pv};
+    const hMax=Math.max(.5,parseFloat(document.getElementById('hmax').value)||5);
+    const uMax=Math.max(.5,parseFloat(document.getElementById('umax').value)||5);
+    const cmNm=document.getElementById('cmap').value;
+    const nL=parseInt(document.getElementById('nlevels').value)||8;
+    const doLine=document.getElementById('chkLines').checked;
+    const doLbl=document.getElementById('chkLabels').checked;
+    const doFull=document.getElementById('chkFull').checked;
+    const hMin=doFull?-hMax:0, uMin=doFull?-uMax:0;
+    const hRange=hMax-hMin, uRange=uMax-uMin;
+
+    // Use Publication font preset for saved file regardless of screen setting
+    const _FS=document.getElementById('fontsize').value;
+    const FSmap={screen:{tick:10,axlabel:11,pad:{l:doFull?54:46,r:16,t:16,b:38}},
+                 medium:{tick:13,axlabel:14,pad:{l:doFull?68:58,r:20,t:20,b:50}},
+                 large: {tick:16,axlabel:17,pad:{l:doFull?82:70,r:24,t:24,b:62}},
+                 pub:   {tick:20,axlabel:21,pad:{l:doFull?98:84,r:28,t:28,b:78}}};
+    const FS=FSmap[_FS]||FSmap.pub;
+
+    // Scale so that the output is at least 300 DPI at 96 dpi screen resolution
+    const TARGET_DPI=300;
+    const SCREEN_DPI=96;
+    const S=Math.ceil(TARGET_DPI/SCREEN_DPI);     // = 4  →  384 DPI
+
+    // Output canvas: 2400 px wide min (8 inches at 300 DPI)
+    const screenW=document.getElementById('cw').clientWidth;
+    const screenH=document.getElementById('cw').clientHeight;
+    const W=screenW*S, H=screenH*S;
+
+    // Scale PAD and font sizes
+    const PAD={l:FS.pad.l*S,r:FS.pad.r*S,t:FS.pad.t*S,b:FS.pad.b*S};
+    const FShi={tick:FS.tick*S, axlabel:FS.axlabel*S};
+    const pw=W-PAD.l-PAD.r, ph=H-PAD.t-PAD.b;
+
+    // Compute grid at full resolution
+    const NX=400, NY=400;
+    const grid=await _computeGrid(cur,NX,NY,hMin,hMax,uMin,uMax,p);
+
+    // Render to offscreen canvas
+    const oc=document.createElement('canvas');
+    oc.width=W; oc.height=H;
+    const ctx=oc.getContext('2d');
+    _paint(ctx,W,H,grid,NX,NY,{hMin,hMax,uMin,uMax,hRange,uRange,cmNm,nL,doLine,doLbl,doFull,FS:FShi,PAD});
+
+    // Get PNG blob, inject 300 DPI pHYs chunk
+    oc.toBlob(async blob=>{
+      const ab=await blob.arrayBuffer();
+      const hiDpi=_setPngDpi(ab,TARGET_DPI);
+      const url=URL.createObjectURL(new Blob([hiDpi],{type:'image/png'}));
+      const a=document.createElement('a');
+      a.download='stcov_'+cur+'_300dpi.png';
+      a.href=url; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+      btn.textContent=orig; btn.disabled=false;
+    },'image/png');
+  }catch(e){
+    console.error(e);
+    alert('Save failed: '+e.message);
+    btn.textContent=orig; btn.disabled=false;
+  }
+}
+
+function _axes(ctx,PAD,pw,ph,hMin,hMax,uMin,uMax,FS){
   const hRange=hMax-hMin, uRange=uMax-uMin;
+  const tf=FS.tick, af=FS.axlabel;
+  const tickLen = Math.round(tf*0.45);
   ctx.save();
-  ctx.font='10px IBM Plex Mono,monospace';
+  ctx.font=tf+'px IBM Plex Mono,monospace';
   ctx.fillStyle='#5a718a'; ctx.strokeStyle='#c8d8e8'; ctx.lineWidth=1;
 
-  // choose nice tick count and step
   function niceTicks(lo,hi,n){
     const raw=(hi-lo)/n, exp=Math.pow(10,Math.floor(Math.log10(raw)));
     const step=[1,2,2.5,5,10].map(f=>f*exp).find(s=>s>=raw)||exp*10;
@@ -972,20 +1108,33 @@ function _axes(ctx,PAD,pw,ph,hMin,hMax,uMin,uMax){
   const uTicks=niceTicks(uMin,uMax,5);
 
   // x ticks
-  ctx.textAlign='center';
+  ctx.textAlign='center'; ctx.textBaseline='top';
   hTicks.forEach(v=>{
     const x=PAD.l+((v-hMin)/hRange)*pw;
-    ctx.beginPath();ctx.moveTo(x,PAD.t+ph);ctx.lineTo(x,PAD.t+ph+4);ctx.stroke();
-    // skip 0 label if already drawn via zero-line
-    ctx.fillText(v===0?'0':v%1===0?v.toFixed(0):v.toFixed(1),x,PAD.t+ph+15);
+    ctx.beginPath();ctx.moveTo(x,PAD.t+ph);ctx.lineTo(x,PAD.t+ph+tickLen);ctx.stroke();
+    ctx.fillText(v===0?'0':v%1===0?v.toFixed(0):v.toFixed(1), x, PAD.t+ph+tickLen+3);
   });
+
   // y ticks
-  ctx.textAlign='right';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
   uTicks.forEach(v=>{
     const y=PAD.t+ph-((v-uMin)/uRange)*ph;
-    ctx.beginPath();ctx.moveTo(PAD.l-4,y);ctx.lineTo(PAD.l,y);ctx.stroke();
-    ctx.fillText(v===0?'0':v%1===0?v.toFixed(0):v.toFixed(1),PAD.l-7,y+3);
+    ctx.beginPath();ctx.moveTo(PAD.l-tickLen,y);ctx.lineTo(PAD.l,y);ctx.stroke();
+    ctx.fillText(v===0?'0':v%1===0?v.toFixed(0):v.toFixed(1), PAD.l-tickLen-4, y);
   });
+
+  // axis labels drawn on canvas (included in PNG export)
+  ctx.fillStyle='#3a5068'; ctx.font='600 '+af+'px IBM Plex Mono,monospace';
+  // x-axis label: h
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText('h', PAD.l+pw/2, PAD.t+ph+PAD.b-3);
+  // y-axis label: u  (rotated)
+  ctx.save();
+  ctx.translate(af+2, PAD.t+ph/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillText('u', 0, 0);
+  ctx.restore();
 
   // grid lines
   ctx.strokeStyle='rgba(200,216,232,.35)';ctx.lineWidth=.5;ctx.setLineDash([3,4]);
@@ -1019,7 +1168,41 @@ document.getElementById('ibar').style.display='flex';
 _initEngine();
 let _plotted=false;
 document.getElementById('genBtn').addEventListener('click',()=>{_plotted=true;doPlot()});
-window.addEventListener('resize',()=>{if(_plotted)_render()});
+window.addEventListener('resize',()=>{_applyAspect();if(_plotted)_render()});
+document.getElementById('saveBtn').addEventListener('click',()=>_saveHiRes());
+
+function _applyAspect(){
+  const cw=document.getElementById('cw');
+  const preset=document.getElementById('aspectPreset').value;
+  const customRow=document.getElementById('aspectCustomRow');
+  customRow.style.display=(preset==='custom')?'flex':'none';
+  if(preset==='fill'){
+    // Fill: let the container dictate height via flex
+    cw.style.height='';
+    cw.style.flex='1';
+    return;
+  }
+  cw.style.flex='none';
+  let wRatio, hRatio;
+  if(preset==='custom'){
+    wRatio=parseFloat(document.getElementById('arW').value)||4;
+    hRatio=parseFloat(document.getElementById('arH').value)||3;
+  } else {
+    [wRatio,hRatio]=preset.split(':').map(Number);
+  }
+  const W=cw.clientWidth||600;
+  cw.style.height=Math.round(W*hRatio/wRatio)+'px';
+}
+
+document.getElementById('aspectPreset').addEventListener('change',()=>{
+  _applyAspect();
+  if(_plotted)_render();
+});
+['arW','arH'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{
+  _applyAspect();
+  if(_plotted)_render();
+}));
+_applyAspect();
 
 function toggleRefs(){
   const body=document.getElementById('refsBody');
